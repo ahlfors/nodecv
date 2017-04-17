@@ -3,6 +3,7 @@
 void imgproc::Init(Local<Object> target) {
   Nan::HandleScope scope;
   Nan::SetMethod(target, "matchTemplate", matchTemplate);
+  Nan::SetMethod(target, "findPairs", findPairs);
 };
 
 NAN_METHOD(imgproc::matchTemplate) {
@@ -74,6 +75,28 @@ NAN_METHOD(imgproc::matchTemplate) {
     argv[1] = Nan::Null();
   }
 
+  Nan::TryCatch try_catch;
+  cb->Call(Nan::GetCurrentContext()->Global(), 2, argv);
+  
+  if (try_catch.HasCaught()) {
+    Nan::FatalException(try_catch);
+  }
+  
+  return;
+}
+
+NAN_METHOD(imgproc::findPairs) {
+  Nan::EscapableHandleScope scope;
+  Mat *img1 = Nan::ObjectWrap::Unwrap<Mat>(info[0]->ToObject());
+  Mat *img2 = Nan::ObjectWrap::Unwrap<Mat>(info[1]->ToObject());
+
+  Local<Function> cb = Local<Function>::Cast(info[2]);
+  
+  Local<Value> argv[2];
+  argv[0] = Nan::Null();
+  argv[1] = Nan::EmptyString();
+  
+  
   Nan::TryCatch try_catch;
   cb->Call(Nan::GetCurrentContext()->Global(), 2, argv);
   

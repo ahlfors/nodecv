@@ -13,6 +13,7 @@ class imgproc : public Nan::ObjectWrap {
   public:
     static void Init(Local<Object> target);
     static NAN_METHOD(matchTemplate);
+    static NAN_METHOD(findPairs);
 };
 
 #endif
