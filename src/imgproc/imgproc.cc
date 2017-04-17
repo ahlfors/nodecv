@@ -254,9 +254,12 @@ int locatePlanarObject( const CvSeq* objectKeypoints, const CvSeq* objectDescrip
 
 NAN_METHOD(imgproc::findPairs) {
   Nan::EscapableHandleScope scope;
-  Mat *object = Nan::ObjectWrap::Unwrap<Mat>(info[0]->ToObject());
-  Mat *image = Nan::ObjectWrap::Unwrap<Mat>(info[1]->ToObject());
-
+  Mat *mat_object = Nan::ObjectWrap::Unwrap<Mat>(info[0]->ToObject());
+  Mat *mat_image = Nan::ObjectWrap::Unwrap<Mat>(info[1]->ToObject());
+  
+  IplImage* object = cvCreateImage(cvGetSize(&mat_object->mat), 8, 1);
+  IplImage* image = cvCreateImage(cvGetSize(&mat_image->mat), 8, 1);
+  
   Local<Function> cb = Local<Function>::Cast(info[2]);
   
   Local<Value> argv[2];
@@ -273,9 +276,9 @@ NAN_METHOD(imgproc::findPairs) {
   };
   
   PairResult res = {-1, -1, -1, -1, -1, -1};
-  
-  image->mat = cv::imdecode(image->mat, CV_LOAD_IMAGE_GRAYSCALE);
-  image->mat = cv::imdecode(image->mat, CV_LOAD_IMAGE_GRAYSCALE);
+
+  res.dstWidth = image->width;
+  res.dstHeight = image->height;
   
   CvMemStorage* storage = cvCreateMemStorage(0);
   
@@ -295,7 +298,7 @@ NAN_METHOD(imgproc::findPairs) {
   };
   
   IplImage* object_color = cvCreateImage(cvGetSize(object), 8, 3);
-  cvCvtColor( object, object_color, CV_GRAY2BGR );
+  cvCvtColor(object, object_color, CV_GRAY2BGR);
   
   CvSeq* objectKeypoints = 0, *objectDescriptors = 0;
   CvSeq* imageKeypoints = 0, *imageDescriptors = 0;
@@ -306,19 +309,31 @@ NAN_METHOD(imgproc::findPairs) {
   cvExtractSURF(object, 0, &objectKeypoints, &objectDescriptors, storage, params);
   
   cvExtractSURF(image, 0, &imageKeypoints, &imageDescriptors, storage, params);
+  
   tt = (double)cvGetTickCount() - tt;
   
-  CvPoint src_corners[4] = {{0,0}, {object->mat.size().width,0}, {object->mat.size().width, object->mat.size().height}, {0, object->mat.size().height}};
   
+  CvPoint src_corners[4] = {{0,0}, {object->width,0}, {object->width, object->height}, {0, object->height}};
   CvPoint dst_corners[4];
-  IplImage* correspond = cvCreateImage(cvSize(image->mat.size().width, object->mat.size().height + image->mat.size().height), 8, 1 );
-  cvSetImageROI(correspond, cvRect(0, 0, object->mat.size().width, object->mat.size().height));
+  IplImage* correspond = cvCreateImage( cvSize(image->width, object->height+image->height), 8, 1);
+  cvSetImageROI(correspond, cvRect(0, 0, object->width, object->height));
   cvCopy(object, correspond);
-  cvSetImageROI(correspond, cvRect(0, object->mat.size().height, correspond->width, correspond->height));
+  cvSetImageROI(correspond, cvRect( 0, object->height, correspond->width, correspond->height));
   cvCopy(image, correspond);
   cvResetImageROI(correspond);
-  if (locatePlanarObject(objectKeypoints, objectDescriptors, imageKeypoints, imageDescriptors, src_corners, dst_corners )) {
-
+  
+  if ( locatePlanarObject(objectKeypoints, objectDescriptors, imageKeypoints,
+                         imageDescriptors, src_corners, dst_corners )) {
+    for (i = 0; i < 4; i++) {
+      CvPoint r1 = dst_corners[i%4];
+      CvPoint r2 = dst_corners[(i+1)%4];
+      cvLine( correspond, cvPoint(r1.x, r1.y+object->height ),
+             cvPoint(r2.x, r2.y+object->height ), colors[8] );
+    }
+    res.pairPointX1 = dst_corners[0].x;
+    res.pairPointY1 = dst_corners[0].y;
+    res.pairPointX2 = dst_corners[2].x;
+    res.pairPointY2 = dst_corners[2].y;
   }
   
   Nan::TryCatch try_catch;
